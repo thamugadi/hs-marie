@@ -4,22 +4,24 @@ import Data.Word as DW
 import Data.Char as DC
 data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 | Input | Output | Halt | Skipcond Word16 | Jump Word16 deriving (Eq, Show, Read)
 
-decode :: Word16 -> Instruction
+decode :: Word16 -> Maybe Instruction
 decode instr =
         case op of
-          1 -> Load addr
-          2 -> Store addr
-          3 -> Add addr
-          4 -> Sub addr
-          5 -> Input
-          6 -> Output
-          7 -> Halt
-          8 -> Skipcond sk
-          9 -> Jump addr
+          1 -> Just (Load addr)
+          2 -> Just (Store addr)
+          3 -> Just (Add addr)
+          4 -> Just (Sub addr)
+          5 -> Just Input
+          6 -> Just Output
+          7 -> Just Halt
+          8 -> Just (Skipcond sk)
+          9 -> Just (Jump addr)
+          otherwise -> Nothing
         where 
                 op   = shiftR (andb instr 0xf000) 12
                 addr = andb instr 0x0fff
                 sk   = andb instr 3
+
 encode :: Instruction -> Word16
 encode instr =
         case instr of
@@ -33,44 +35,47 @@ encode instr =
           Skipcond sk -> 0x8000 + sk
           Jump  addr  -> 0x9000 + addr
 
+valid :: Maybe Instruction -> Instruction
+valid (Just a) = a
+
 marie :: [Word16] -> Word16 -> Word16 -> Word16 -> IO()
 marie memory ir ac pc =
-        case decode ir of
-          Load x -> marie memory (memory!!addrpc) (memory!!addrx) (pc+1) where
+        case (decode ir) of
+          Just (Load x) -> marie memory (memory!!addrpc) (memory!!addrx) (pc+1) where
                   addrx  = w16i x
                   addrpc = w16i pc
-          Store x -> marie newmemory (memory!!addrpc) ac (pc+1) where
+          Just (Store x) -> marie newmemory (memory!!addrpc) ac (pc+1) where
                   addrx  = w16i x
                   addrpc = w16i pc
                   newmemory = take (addrx-1) memory ++ [ac] ++ drop (addrx+1) memory
-          Add x -> marie memory (memory!!addrpc) (ac+memory!!addrx) (pc+1) where
+          Just (Add x) -> marie memory (memory!!addrpc) (ac+memory!!addrx) (pc+1) where
                   addrx = w16i x
                   addrpc = w16i pc
-          Sub x -> marie memory (memory!!addrpc) (ac-memory!!addrx) (pc+1) where
+          Just (Sub x) -> marie memory (memory!!addrpc) (ac-memory!!addrx) (pc+1) where
                   addrx = w16i x
                   addrpc = w16i pc
-          Input -> do
+          Just Input -> do
                   hee <- getChar
                   let byte = fromIntegral . ord $ hee :: Word16
                   marie memory (memory!!addrpc) byte (pc+1) where 
                           addrpc = w16i pc
-          Output -> do
+          Just Output -> do
                   print ac
                   marie memory (memory!!addrpc) ac (pc+1) where
                           addrpc = w16i pc
-          Halt -> do
+          Just Halt -> do
                   putStrLn "Halting."
                   pure ()
-          Skipcond 0 -> if (ac < 0) then marie memory (memory!!(w16i pc + 1)) ac (pc+2)
+          Just (Skipcond 0) -> if (ac < 0) then marie memory (memory!!(w16i pc + 1)) ac (pc+2)
                              else marie memory (memory!!(w16i pc)) ac (pc+1)
-          Skipcond 1 -> if (ac == 0) then marie memory (memory!!(w16i pc + 1)) ac (pc+2)
+          Just (Skipcond 1) -> if (ac == 0) then marie memory (memory!!(w16i pc + 1)) ac (pc+2)
                              else marie memory (memory!!(w16i pc)) ac (pc+1)
-          Skipcond 2 -> if (ac > 0) then marie memory (memory!!(w16i pc + 1)) ac (pc+2)
+          Just (Skipcond 2) -> if (ac > 0) then marie memory (memory!!(w16i pc + 1)) ac (pc+2)
                              else marie memory (memory!!(w16i pc)) ac (pc+1)
-          Skipcond 3 -> putStrLn "An error has occured."
-          Jump x -> marie memory (memory!!addrpc) ac (x+1) where
+          Just (Skipcond 3) -> putStrLn "An error has occured."
+          Just (Jump x) -> marie memory (memory!!addrpc) ac (x+1) where
                   addrpc = w16i x
-          otherwise -> putStrLn "!!BAD OPERATION!!"
+          Nothing -> putStrLn "!!BAD INSTRUCTION!!"
 
 startMarie :: Int -> [Word16] -> IO()
 startMarie memsize romlist = marie mem (mem!!0) 0 1 where
