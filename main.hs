@@ -51,7 +51,7 @@ marie memory ir ac pc =
                   addrpc = w16i pc
           Input -> do
                   hee <- getChar
-                  let byte = fromIntegral (ord hee) :: Word16
+                  let byte = fromIntegral . ord $ hee :: Word16
                   marie memory (memory!!addrpc) byte (pc+1) where 
                           addrpc = w16i pc
           Output -> do
@@ -83,9 +83,11 @@ w16i :: Word16 -> Int
 w16i n = fromIntegral n :: Int
 
 list2data :: [String] -> [Word16]
+list2data [] = []
 list2data (x:xs) = (read x :: Word16) : list2data xs
 
 encodeList :: [String] -> [Word16]
+encodeList [] = []
 encodeList (".data":xs) = list2data xs 
 encodeList (x:xs) = encode ((read x :: Instruction)) : encodeList xs
 
@@ -97,5 +99,4 @@ main = do
         putStrLn "open file: "
         name <- getLine
         c <- readFile name
-
         startMarie 1000 $ encodeStr c
