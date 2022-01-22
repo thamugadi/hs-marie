@@ -4,9 +4,7 @@ import Data.Word as DW
 import Data.Char as DC
 
 data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 | Input | Output | Halt | Skipcond Word16 | Jump Word16 deriving (Eq, Show, Read)
-
 data CPU = CPU Word16 Word16 Word16 Word16 Word16
-
 data Memory = Memory [Word16]
 
 decode :: Word16 -> Maybe Instruction
