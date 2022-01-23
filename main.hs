@@ -78,23 +78,23 @@ executeCycle (Just instr) cpu memory = do
 
 newCycleNewCPU :: (Word16 -> CPU -> Memory -> CPU) -> Word16 -> CPU -> Memory -> IO()
 newCycleNewCPU instr x cpu memory =
-        executeCycle (decodeCycle newCPU) (fetchCycle newCPU memory) memory where
-                newCPU = instr x cpu memory
+        executeCycle (decodeCycle $ fetchCycle newCPU memory) (fetchCycle newCPU memory) memory where
+                newCPU =  instr x cpu memory
 
 newCycleNewMemory :: (Word16 -> CPU -> Memory -> Memory) -> Word16 -> CPU -> Memory -> IO()
 newCycleNewMemory instr x cpu memory =
-        executeCycle (decodeCycle cpu) (fetchCycle cpu newMemory) newMemory where
+        executeCycle (decodeCycle $ fetchCycle cpu newMemory) (fetchCycle cpu newMemory) newMemory where
                 newMemory = instr x cpu memory
 
 newCycleNewIOCPU :: (CPU -> IO CPU) -> CPU -> Memory -> IO()
 newCycleNewIOCPU instr cpu memory = do
         newCPU <- instr cpu
-        executeCycle (decodeCycle newCPU) (fetchCycle newCPU memory) memory
+        executeCycle (decodeCycle $ fetchCycle newCPU memory) (fetchCycle newCPU memory) memory
 
 newCycleAfterOutput :: (CPU -> IO()) -> CPU -> Memory -> IO()
 newCycleAfterOutput instr cpu memory = do
         instr cpu
-        executeCycle (decodeCycle cpu) (fetchCycle cpu memory) memory
+        executeCycle (decodeCycle $ fetchCycle cpu memory) (fetchCycle cpu memory) memory
 
 load :: Word16 -> CPU -> Memory -> CPU
 load x (CPU mar mbr ir ac pc) memory = CPU mar mbr ir (accessMemory memory x) pc
