@@ -24,7 +24,7 @@ decode instr =
           9 -> Just $ Jump addr
           otherwise -> Nothing
         where 
-                op   = shiftR (andb instr 0xf000) 12
+                op   = shiftR instr 12
                 addr = andb instr 0x0fff
                 sk   = andb instr 3
 
