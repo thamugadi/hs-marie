@@ -35,7 +35,7 @@ encode instr =
           Input       -> 0x5000
           Output      -> 0x6000
           Halt        -> 0x7000
-          Skipcond sk -> 0x8000 + sk
+          Skipcond sk -> 0x8000 + (mod sk 3)
           Jump  addr  -> 0x9000 + addr
 
 accessMemory :: Memory -> Word16 -> Word16
@@ -73,8 +73,8 @@ executeCycle (Just instr) cpu memory = do
                 Output -> newCycleAfterOutput output cpu memory
                 Halt -> putStrLn "Halting."
                 Jump x -> newCycleNewCPU jump x cpu memory
-                Skipcond 3 -> putStrLn "!!BAD INSTRUCTION!!"
                 Skipcond x -> newCycleNewCPU skipcond x cpu memory
+
 newCycleNewCPU :: (Word16 -> CPU -> Memory -> CPU) -> Word16 -> CPU -> Memory -> IO()
 newCycleNewCPU instr x cpu memory =
         executeCycle (decodeCycle newCPU) (fetchCycle newCPU memory) memory where
