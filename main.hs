@@ -32,29 +32,29 @@ encode :: Instruction -> Word16
 encode instr =
         case instr of
           Load addr  -> 0x1000 + addr
-          (Store addr) -> 0x2000 + addr
-          (Add addr)   -> 0x3000 + addr
-          (Sub addr)   -> 0x4000 + addr
-          Input        -> 0x5000
-          Output       -> 0x6000
-          Halt         -> 0x7000
-          (Skipcond sk)-> 0x8000 + (mod sk 3)
-          (Jump addr)  -> 0x9000 + addr
+          Store addr -> 0x2000 + addr
+          Add addr   -> 0x3000 + addr
+          Sub addr   -> 0x4000 + addr
+          Input      -> 0x5000
+          Output     -> 0x6000
+          Halt       -> 0x7000
+          Skipcond sk-> 0x8000 + (mod sk 3)
+          Jump addr  -> 0x9000 + addr
 
 accessMemory :: Memory -> Word16 -> Word16
 accessMemory (Memory mem) addr = maybe 0xffff id $ listToMaybe $ drop pos mem where
         pos = w16i addr
 
 modifyMemory :: Memory -> Word16 -> Word16 -> Memory
-modifyMemory (Memory mem) addr new
-        | w16i addr < length mem && w16i addr >= 0 = Memory $ take (pos-1) mem ++ [new] ++ drop pos mem
-        | otherwise = Memory mem where
-                pos = w16i addr
+modifyMemory (Memory mem) addr new 
+     | pos < length mem && pos > 0 = Memory $ take pos mem ++ [new] ++ drop (pos + 1) mem
+     | otherwise = Memory mem where
+          pos = w16i addr
 
 startMarie :: Int -> [Word16] -> IO()
-startMarie memsize romlist = executeCycle firstInstr initialCPU initialmem where
+startMarie memsize rom = executeCycle firstInstr initialCPU initialmem where
         annexmem   = take memsize $ repeat 0
-        initialmem = Memory $ romlist ++ annexmem
+        initialmem = Memory $ rom ++ annexmem
         emptyCPU   = CPU 0 0 0
         initialCPU = fetchCycle emptyCPU initialmem
         firstInstr = decodeCycle initialCPU
@@ -121,7 +121,7 @@ input (CPU ir ac pc) = do
         let byte = fromIntegral . ord $ ch :: Word16
         return $ CPU ir byte pc
 output :: CPU -> IO()
-output (CPU ir ac pc) = printf "0x%02x\n" ac 
+output (CPU ir ac pc) = printf "0x%x\n" ac 
 jump :: Word16 -> CPU -> Memory -> CPU
 jump x (CPU ir ac pc) memory = CPU ir ac x
 
