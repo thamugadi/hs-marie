@@ -1,8 +1,9 @@
-import Data.List as DL
-import Data.Bits as DB
-import Data.Word as DW
-import Data.Char as DC
-import Text.Read as TR
+import Data.List
+import Data.Bits
+import Data.Word
+import Data.Char
+import Text.Read
+import Text.Printf
 data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 | Input | Output | Halt | Skipcond Word16 | Jump Word16 deriving (Eq, Show, Read)
 data CPU = CPU Word16 Word16 Word16
 data Memory = Memory [Word16]
@@ -109,7 +110,7 @@ input (CPU ir ac pc) = do
         let byte = fromIntegral . ord $ ch :: Word16
         return (CPU ir byte pc)
 output :: CPU -> IO()
-output (CPU ir ac pc) = print ac
+output (CPU ir ac pc) = printf "0x%02x\n" ac 
 jump :: Word16 -> CPU -> Memory -> CPU
 jump x (CPU ir ac pc) memory = CPU ir ac x
 
@@ -132,11 +133,15 @@ w16i n = fromIntegral n :: Int
 
 list2data :: [String] -> [Word16]
 list2data [] = []
-list2data (x:xs) = [read x :: Word16] ++ list2data xs
+list2data (x:xs) = [encodeData (readMaybe x :: Maybe Word16)] ++ list2data xs
+
+encodeData :: Maybe Word16 -> Word16
+encodeData Nothing = 0xffff
+encodeData (Just word) = word
 
 encodeList :: [String] -> [Word16]
 encodeList [] = []
-encodeList (".data":xs) = list2data xs 
+encodeList (".data":xs) = list2data xs
 encodeList (x:xs) = [encode (readMaybe x :: Maybe Instruction)] ++ encodeList xs
 encodeStr :: String -> [Word16]
 encodeStr str = encodeList $ lines str
