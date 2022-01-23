@@ -39,18 +39,18 @@ encode instr =
           Just (Jump  addr)  ->  0x9000 + addr
           Nothing ->             0xf000
 accessMemory :: Memory -> Word16 -> Word16
-accessMemory (Memory mem) addr = if (w16i addr < length mem) then (mem!!(w16i addr))
+accessMemory (Memory mem) addr = if w16i addr < length mem then mem!!w16i addr
                                                         else fromIntegral 0 :: Word16
 
 modifyMemory :: Memory -> Word16 -> Word16 -> Memory
 modifyMemory (Memory mem) addr new =
-        if (w16i addr < length mem) then (Memory ((take ((w16i addr)-1) mem) ++ [new] ++ (drop ((w16i addr)) mem)) )
-                             else (Memory mem)
+        if w16i addr < length mem then Memory $ take ((w16i addr)-1) mem ++ [new] ++ drop (w16i addr) mem
+                             else Memory mem
 
 
 startMarie :: Int -> [Word16] -> IO()
 startMarie memsize romlist = executeCycle firstInstr initialCPU initialmem where
-        initialmem = Memory (romlist ++ (take memsize (repeat 0)))
+        initialmem = Memory $ romlist ++ (take memsize (repeat 0))
         emptyCPU = CPU 0 0 0 0 0
         initialCPU = fetchCycle emptyCPU initialmem
         firstInstr = decodeCycle initialCPU
