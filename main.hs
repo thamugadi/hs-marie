@@ -76,8 +76,6 @@ executeCycle (Just instr) cpu memory = do
                 Jump x -> newCycleNewCPU jump x cpu memory
                 Skipcond x -> newCycleNewCPU skipcond x cpu memory
 
--- This is to be updated::
-
 newCycleNewCPU :: (Word16 -> CPU -> Memory -> CPU) -> Word16 -> CPU -> Memory -> IO()
 newCycleNewCPU instr x cpu memory =
         executeCycle (decodeCycle newCPU) (fetchCycle newCPU memory) memory where
