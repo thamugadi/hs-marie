@@ -28,19 +28,18 @@ decode instr =
                 addr = andb instr 0x0fff
                 sk   = andb instr 3
 
-encode :: Maybe Instruction -> Word16
+encode :: Instruction -> Word16
 encode instr =
         case instr of
-          Just (Load addr)  -> 0x1000 + addr
-          Just (Store addr) -> 0x2000 + addr
-          Just (Add addr)   -> 0x3000 + addr
-          Just (Sub addr)   -> 0x4000 + addr
-          Just Input        -> 0x5000
-          Just Output       -> 0x6000
-          Just Halt         -> 0x7000
-          Just (Skipcond sk)-> 0x8000 + (mod sk 3)
-          Just (Jump addr)  -> 0x9000 + addr
-          Nothing ->           0xffff
+          Load addr  -> 0x1000 + addr
+          (Store addr) -> 0x2000 + addr
+          (Add addr)   -> 0x3000 + addr
+          (Sub addr)   -> 0x4000 + addr
+          Input        -> 0x5000
+          Output       -> 0x6000
+          Halt         -> 0x7000
+          (Skipcond sk)-> 0x8000 + (mod sk 3)
+          (Jump addr)  -> 0x9000 + addr
 
 accessMemory :: Memory -> Word16 -> Word16
 accessMemory (Memory mem) addr = maybe 0xffff id $ listToMaybe $ drop pos mem where
@@ -60,6 +59,9 @@ startMarie memsize romlist = executeCycle firstInstr initialCPU initialmem where
         initialCPU = fetchCycle emptyCPU initialmem
         firstInstr = decodeCycle initialCPU
 
+illegalInstruction :: IO()
+illegalInstruction = putStrLn "!!BAD INSTRUCTION!!"
+
 fetchCycle :: CPU -> Memory -> CPU
 fetchCycle (CPU ir ac pc) mem = CPU (accessMemory mem pc) ac (pc+1) 
 
@@ -67,36 +69,36 @@ decodeCycle :: CPU -> Maybe Instruction
 decodeCycle (CPU ir ac pc) = decode ir
 
 executeCycle :: Maybe Instruction -> CPU -> Memory -> IO()
-executeCycle Nothing _ _ = putStrLn "!!BAD INSTRUCTION!!"
+executeCycle Nothing cpu memory = illegalInstruction
 executeCycle (Just instr) cpu memory = do
         case instr of
-                Load x -> newCycleNewCPU load x cpu memory
-                Store x -> newCycleNewMemory store x cpu memory 
-                Add x -> newCycleNewCPU add x cpu memory
-                Sub x -> newCycleNewCPU sub x cpu memory
-                Input -> newCycleNewIOCPU input cpu memory
-                Output -> newCycleAfterOutput output cpu memory
-                Halt -> putStrLn "Halting."
-                Jump x -> newCycleNewCPU jump x cpu memory
+                Load x     -> newCycleNewCPU load x cpu memory
+                Store x    -> newCycleNewMemory store x cpu memory 
+                Add x      -> newCycleNewCPU add x cpu memory
+                Sub x      -> newCycleNewCPU sub x cpu memory
+                Input      -> newCycleNewIOCPU input cpu memory
+                Output     -> newCycleAfterOutput output cpu memory
+                Halt       -> halt
+                Jump     x -> newCycleNewCPU jump x cpu memory
                 Skipcond x -> newCycleNewCPU skipcond x cpu memory
 
 newCycleNewCPU :: (Word16 -> CPU -> Memory -> CPU) -> Word16 -> CPU -> Memory -> IO()
 newCycleNewCPU instr x cpu memory =
         executeCycle nextInstruction newCPU memory where
-                cpuInstr = instr x cpu memory
-                newCPU = fetchCycle cpuInstr memory
+                cpuInstr        = instr x cpu memory
+                newCPU          = fetchCycle cpuInstr memory
                 nextInstruction = decodeCycle newCPU 
 newCycleNewMemory :: (Word16 -> CPU -> Memory -> Memory) -> Word16 -> CPU -> Memory -> IO()
 newCycleNewMemory instr x cpu memory =
         executeCycle nextInstruction newCPU newMemory where
-                newMemory = instr x cpu memory
-                newCPU = fetchCycle cpu newMemory
+                newMemory       = instr x cpu memory
+                newCPU          = fetchCycle cpu newMemory
                 nextInstruction = decodeCycle newCPU
 
 newCycleNewIOCPU :: (CPU -> IO CPU) -> CPU -> Memory -> IO()
 newCycleNewIOCPU instr cpu memory = do
         cpuInstr <- instr cpu
-        let newCPU = fetchCycle cpuInstr memory
+        let newCPU          = fetchCycle cpuInstr memory
         let nextInstruction = decodeCycle newCPU
         executeCycle nextInstruction newCPU memory
 
@@ -117,7 +119,7 @@ input :: CPU -> IO CPU
 input (CPU ir ac pc) = do
         ch <- getChar
         let byte = fromIntegral . ord $ ch :: Word16
-        return (CPU ir byte pc)
+        return $ CPU ir byte pc
 output :: CPU -> IO()
 output (CPU ir ac pc) = printf "0x%02x\n" ac 
 jump :: Word16 -> CPU -> Memory -> CPU
@@ -127,12 +129,12 @@ nop :: CPU -> Memory -> CPU
 nop cpu memory = cpu
 
 skipcond :: Word16 -> CPU -> Memory -> CPU
-skipcond 0 (CPU ir ac pc) memory = 
-        if (ac < 0) then CPU ir ac (pc+1) else CPU ir ac pc
-skipcond 1 (CPU ir ac pc) memory =
-        if (ac == 0) then CPU ir ac (pc+1) else CPU ir ac pc
-skipcond 2 (CPU ir ac pc) memory =
-        if (ac > 0) then CPU ir ac (pc+1) else CPU ir ac pc
+skipcond 0 (CPU ir ac pc) memory = if (ac < 0)  then CPU ir ac (pc+1) else CPU ir ac pc
+skipcond 1 (CPU ir ac pc) memory = if (ac == 0) then CPU ir ac (pc+1) else CPU ir ac pc
+skipcond 2 (CPU ir ac pc) memory = if (ac > 0)  then CPU ir ac (pc+1) else CPU ir ac pc
+
+halt :: IO()
+halt = putStrLn "Halting."
 
 andb a b = (.&.) a b
 orb  a b = (.|.) a b
@@ -142,16 +144,12 @@ w16i n = fromIntegral n :: Int
 
 list2data :: [String] -> [Word16]
 list2data [] = []
-list2data (x:xs) = [encodeData (readMaybe x :: Maybe Word16)] ++ list2data xs
-
-encodeData :: Maybe Word16 -> Word16
-encodeData Nothing = 0xffff
-encodeData (Just word) = word
+list2data (x:xs) = [maybe 0xffff id (readMaybe x :: Maybe Word16)] ++ list2data xs
 
 encodeList :: [String] -> [Word16]
 encodeList [] = []
 encodeList (".data":xs) = list2data xs
-encodeList (x:xs) = [encode (readMaybe x :: Maybe Instruction)] ++ encodeList xs
+encodeList (x:xs) = [maybe 0xffff encode (readMaybe x :: Maybe Instruction)] ++ encodeList xs
 encodeStr :: String -> [Word16]
 encodeStr str = encodeList $ lines str
 
