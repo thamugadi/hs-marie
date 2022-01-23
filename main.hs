@@ -19,7 +19,6 @@ decode instr =
           7 -> Just Halt
           8 -> Just (Skipcond sk)
           9 -> Just (Jump addr)
-          15 -> Just Halt
           otherwise -> Nothing
         where 
                 op   = shiftR (andb instr 0xf000) 12
