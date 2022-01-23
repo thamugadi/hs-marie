@@ -2,7 +2,7 @@ import Data.List as DL
 import Data.Bits as DB
 import Data.Word as DW
 import Data.Char as DC
-
+import Text.Read as TR
 data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 | Input | Output | Halt | Skipcond Word16 | Jump Word16 deriving (Eq, Show, Read)
 data CPU = CPU Word16 Word16 Word16 Word16 Word16
 data Memory = Memory [Word16]
@@ -19,25 +19,26 @@ decode instr =
           7 -> Just Halt
           8 -> Just (Skipcond sk)
           9 -> Just (Jump addr)
+          15 -> Just Halt
           otherwise -> Nothing
         where 
                 op   = shiftR (andb instr 0xf000) 12
                 addr = andb instr 0x0fff
                 sk   = andb instr 3
 
-encode :: Instruction -> Word16
+encode :: Maybe Instruction -> Word16
 encode instr =
         case instr of
-          Load  addr ->  0x1000 + addr
-          Store addr ->  0x2000 + addr
-          Add   addr ->  0x3000 + addr
-          Sub   addr ->  0x4000 + addr
-          Input       -> 0x5000
-          Output      -> 0x6000
-          Halt        -> 0x7000
-          Skipcond sk -> 0x8000 + (mod sk 3)
-          Jump  addr  -> 0x9000 + addr
-
+          Just (Load  addr)  ->  0x1000 + addr
+          Just (Store addr)  ->  0x2000 + addr
+          Just (Add   addr)  ->  0x3000 + addr
+          Just (Sub   addr)  ->  0x4000 + addr
+          Just  Input        ->  0x5000
+          Just  Output       ->  0x6000
+          Just  Halt         ->  0x7000
+          Just (Skipcond sk) ->  0x8000 + (mod sk 3)
+          Just (Jump  addr)  ->  0x9000 + addr
+          Nothing ->             0xf000
 accessMemory :: Memory -> Word16 -> Word16
 accessMemory (Memory mem) addr = if (w16i addr < length mem) then (mem!!(w16i addr))
                                                         else fromIntegral 0 :: Word16
@@ -74,6 +75,8 @@ executeCycle (Just instr) cpu memory = do
                 Halt -> putStrLn "Halting."
                 Jump x -> newCycleNewCPU jump x cpu memory
                 Skipcond x -> newCycleNewCPU skipcond x cpu memory
+
+-- This is to be updated::
 
 newCycleNewCPU :: (Word16 -> CPU -> Memory -> CPU) -> Word16 -> CPU -> Memory -> IO()
 newCycleNewCPU instr x cpu memory =
@@ -137,10 +140,9 @@ list2data (x:xs) = (read x :: Word16) : list2data xs
 encodeList :: [String] -> [Word16]
 encodeList [] = []
 encodeList (".data":xs) = list2data xs 
-encodeList (x:xs) = encode ((read x :: Instruction)) : encodeList xs
-
+encodeList (x:xs) = (encode (readMaybe x :: Maybe Instruction)) : encodeList xs
 encodeStr :: String -> [Word16]
-encodeStr str = encodeList $ lines str
+encodeStr str = encodeList (lines str)
 
 main :: IO()
 main = do
