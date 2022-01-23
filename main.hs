@@ -4,7 +4,7 @@ import Data.Word as DW
 import Data.Char as DC
 import Text.Read as TR
 data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 | Input | Output | Halt | Skipcond Word16 | Jump Word16 deriving (Eq, Show, Read)
-data CPU = CPU Word16 Word16 Word16 Word16 Word16
+data CPU = CPU Word16 Word16 Word16
 data Memory = Memory [Word16]
 
 decode :: Word16 -> Maybe Instruction
@@ -51,15 +51,15 @@ modifyMemory (Memory mem) addr new =
 startMarie :: Int -> [Word16] -> IO()
 startMarie memsize romlist = executeCycle firstInstr initialCPU initialmem where
         initialmem = Memory $ romlist ++ (take memsize (repeat 0))
-        emptyCPU = CPU 0 0 0 0 0
+        emptyCPU   = CPU 0 0 0
         initialCPU = fetchCycle emptyCPU initialmem
         firstInstr = decodeCycle initialCPU
 
 fetchCycle :: CPU -> Memory -> CPU
-fetchCycle (CPU mar mbr ir ac pc) mem = CPU pc (accessMemory mem pc) (accessMemory mem pc) ac (pc+1)
+fetchCycle (CPU ir ac pc) mem = CPU (accessMemory mem pc) ac (pc+1)
 
 decodeCycle :: CPU -> Maybe Instruction
-decodeCycle (CPU mar mbr ir ac pc) = decode ir
+decodeCycle (CPU ir ac pc) = decode ir
 
 executeCycle :: Maybe Instruction -> CPU -> Memory -> IO()
 executeCycle Nothing _ _ = putStrLn "!!BAD INSTRUCTION!!"
@@ -96,33 +96,33 @@ newCycleAfterOutput instr cpu memory = do
         executeCycle (decodeCycle $ fetchCycle cpu memory) (fetchCycle cpu memory) memory
 
 load :: Word16 -> CPU -> Memory -> CPU
-load x (CPU mar mbr ir ac pc) memory = CPU mar mbr ir (accessMemory memory x) pc
+load x (CPU ir ac pc) memory = CPU ir (accessMemory memory x) pc
 store :: Word16 -> CPU -> Memory -> Memory
-store x (CPU mar mbr ir ac pc) memory = modifyMemory memory x ac
+store x (CPU ir ac pc) memory = modifyMemory memory x ac
 add :: Word16 -> CPU -> Memory -> CPU
-add x (CPU mar mbr ir ac pc) memory = CPU mar mbr ir (ac+(accessMemory memory x)) pc
+add x (CPU ir ac pc) memory = CPU ir (ac+(accessMemory memory x)) pc
 sub :: Word16 -> CPU -> Memory -> CPU
-sub x (CPU mar mbr ir ac pc) memory = CPU mar mbr ir (ac-(accessMemory memory x)) pc  
+sub x (CPU ir ac pc) memory = CPU ir (ac-(accessMemory memory x)) pc  
 input :: CPU -> IO CPU
-input (CPU mar mbr ir ac pc) = do
+input (CPU ir ac pc) = do
         ch <- getChar
         let byte = fromIntegral . ord $ ch :: Word16
-        return (CPU mar mbr ir byte pc)
+        return (CPU ir byte pc)
 output :: CPU -> IO()
-output (CPU mar mbr ir ac pc) = print ac
+output (CPU ir ac pc) = print ac
 jump :: Word16 -> CPU -> Memory -> CPU
-jump x (CPU mar mbr ir ac pc) memory = CPU mar mbr ir ac x
+jump x (CPU ir ac pc) memory = CPU ir ac x
 
 nop :: CPU -> Memory -> CPU
 nop cpu memory = cpu
 
 skipcond :: Word16 -> CPU -> Memory -> CPU
-skipcond 0 (CPU mar mbr ir ac pc) memory = 
-        if (ac < 0) then (CPU mar mbr ir ac (pc+1)) else nop (CPU mar mbr ir ac pc) memory
-skipcond 1 (CPU mar mbr ir ac pc) memory =
-        if (ac == 0) then (CPU mar mbr ir ac (pc+1)) else nop (CPU mar mbr ir ac pc) memory
-skipcond 2 (CPU mar mbr ir ac pc) memory =
-        if (ac > 0) then (CPU mar mbr ir ac (pc+1)) else nop (CPU mar mbr ir ac pc) memory
+skipcond 0 (CPU ir ac pc) memory = 
+        if (ac < 0) then CPU ir ac (pc+1) else nop (CPU ir ac pc) memory
+skipcond 1 (CPU ir ac pc) memory =
+        if (ac == 0) then CPU ir ac (pc+1) else nop (CPU ir ac pc) memory
+skipcond 2 (CPU ir ac pc) memory =
+        if (ac > 0) then CPU ir ac (pc+1) else nop (CPU ir ac pc) memory
 
 andb a b = (.&.) a b
 orb  a b = (.|.) a b
@@ -132,14 +132,14 @@ w16i n = fromIntegral n :: Int
 
 list2data :: [String] -> [Word16]
 list2data [] = []
-list2data (x:xs) = (read x :: Word16) : list2data xs
+list2data (x:xs) = [read x :: Word16] ++ list2data xs
 
 encodeList :: [String] -> [Word16]
 encodeList [] = []
 encodeList (".data":xs) = list2data xs 
-encodeList (x:xs) = (encode (readMaybe x :: Maybe Instruction)) : encodeList xs
+encodeList (x:xs) = [encode (readMaybe x :: Maybe Instruction)] ++ encodeList xs
 encodeStr :: String -> [Word16]
-encodeStr str = encodeList (lines str)
+encodeStr str = encodeList $ lines str
 
 main :: IO()
 main = do
