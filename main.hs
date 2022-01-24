@@ -13,33 +13,6 @@ data Machine = Machine CPU Memory
 
 decode :: Word16 -> Maybe Instruction
 encode :: Instruction -> Word16
-accessMemory :: Machine -> Word16 -> Word16
-modifyMemory :: Machine -> Word16 -> Word16 -> Machine
-ir :: Machine -> Word16
-ac :: Machine -> Word16
-pc :: Machine -> Word16
-setIR :: Machine -> Word16 -> Machine
-setAC :: Machine -> Word16 -> Machine
-setPC :: Machine -> Word16 -> Machine
-startMachine :: Int -> [Word16] -> IO()
-cycle_ :: Machine -> IO()
-load :: Word16 -> Machine -> Machine
-store :: Word16 -> Machine -> Machine
-add :: Word16 -> Machine -> Machine
-sub :: Word16 -> Machine -> Machine
-input :: Machine -> IO Machine
-output :: Machine -> IO Machine
-jump :: Word16 -> Machine -> Machine
-skipcond :: Word16 -> Machine -> Machine
-halt :: IO()
-w16i :: Word16 -> Int
-andb :: Word16 -> Word16 -> Word16
-orb :: Word16 -> Word16 -> Word16
-encodeList :: [String] -> [Word16]
-encodeStr :: String -> [Word16]
-main :: IO()
-list2data :: [String] -> [Word16]
-
 decode instr =
         case op of
           1 -> Just $ Load addr
@@ -68,6 +41,8 @@ encode instr =
           Skipcond sk-> 0x8000 + (mod sk 3)
           Jump addr  -> 0x9000 + addr
 
+accessMemory :: Machine -> Word16 -> Word16
+modifyMemory :: Machine -> Word16 -> Word16 -> Machine
 accessMemory (Machine cpu (Memory mem)) addr = maybe 0xffff id $ listToMaybe $ drop pos mem where
         pos = w16i addr
 modifyMemory (Machine cpu (Memory mem)) addr new 
@@ -75,6 +50,12 @@ modifyMemory (Machine cpu (Memory mem)) addr new
      | otherwise = Machine cpu $ Memory mem where
           pos = w16i addr
 
+ir :: Machine -> Word16
+ac :: Machine -> Word16
+pc :: Machine -> Word16
+setIR :: Machine -> Word16 -> Machine
+setAC :: Machine -> Word16 -> Machine
+setPC :: Machine -> Word16 -> Machine
 ir (Machine (CPU i a p) mem) = i
 ac (Machine (CPU i a p) mem) = a
 pc (Machine (CPU i a p) mem) = p
@@ -82,6 +63,7 @@ setIR (Machine (CPU i a p) mem) newIR = Machine (CPU newIR a p) mem
 setAC (Machine (CPU i a p) mem) newAC = Machine (CPU i newAC p) mem
 setPC (Machine (CPU i a p) mem) newPC = Machine (CPU i a newPC) mem
 
+cycle_ :: Machine -> IO()
 cycle_ machine = do
         let newMachineFetch  = setIR machine $ accessMemory machine $ pc machine
         let newMachine       = setPC newMachineFetch $ pc newMachineFetch + 1
@@ -96,6 +78,15 @@ cycle_ machine = do
              Skipcond x -> cycle_ $ skipcond x newMachine 
              Halt       -> halt
 
+load :: Word16 -> Machine -> Machine
+store :: Word16 -> Machine -> Machine
+add :: Word16 -> Machine -> Machine
+sub :: Word16 -> Machine -> Machine
+input :: Machine -> IO Machine
+output :: Machine -> IO Machine
+jump :: Word16 -> Machine -> Machine
+skipcond :: Word16 -> Machine -> Machine
+halt :: IO()
 load x machine = setAC machine $ accessMemory machine x
 store x machine = modifyMemory machine x $ ac machine
 add x machine = setAC machine $ ac machine + accessMemory machine x
@@ -114,7 +105,9 @@ skipcond 2 machine = if (ac machine >  0)  then setPC machine $ pc machine + 1 e
 halt = putStrLn "Halting."
 
 
-
+list2data :: [String] -> [Word16]
+encodeList :: [String] -> [Word16]
+encodeStr :: String -> [Word16]
 list2data [] = []
 list2data (x:xs) = [maybe 0xffff id (readMaybe x :: Maybe Word16)] ++ list2data xs
 encodeList [] = []
@@ -122,14 +115,19 @@ encodeList (".data":xs) = list2data xs
 encodeList (x:xs) = [maybe 0xffff encode (readMaybe x :: Maybe Instruction)] ++ encodeList xs
 encodeStr str = encodeList $ lines str
 
+andb :: Word16 -> Word16 -> Word16
+orb :: Word16 -> Word16 -> Word16
+w16i :: Word16 -> Int
 andb a b = (.&.) a b
 orb  a b = (.|.) a b
 w16i n = fromIntegral n :: Int
 
+startMachine :: Int -> [Word16] -> IO()
 startMachine memsize rom = cycle_ initialMachine where
         emptyMachine   = Machine (CPU 0 0 0) $ Memory $ rom ++ replicate memsize 0
         initialMachine = setIR emptyMachine $ accessMemory emptyMachine $ pc emptyMachine
 
+main :: IO()
 main = do
         putStrLn "open file: "
         c <- readFile =<< getLine
