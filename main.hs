@@ -53,7 +53,7 @@ modifyMemory (Memory mem) addr new
 
 startMarie :: Int -> [Word16] -> IO()
 startMarie memsize rom = executeCycle firstInstr initialCPU initialmem where
-        annexmem   = take memsize $ repeat 0
+        annexmem   = replicate memsize 0
         initialmem = Memory $ rom ++ annexmem
         emptyCPU   = CPU 0 0 0
         initialCPU = fetchCycle emptyCPU initialmem
@@ -121,7 +121,7 @@ input (CPU ir ac pc) = do
         let byte = fromIntegral . ord $ ch :: Word16
         return $ CPU ir byte pc
 output :: CPU -> IO()
-output (CPU ir ac pc) = printf "0x%x\n" ac 
+output (CPU ir ac pc) = printf "0x%04x\n" ac 
 jump :: Word16 -> CPU -> Memory -> CPU
 jump x (CPU ir ac pc) memory = CPU ir ac x
 
@@ -156,6 +156,5 @@ encodeStr str = encodeList $ lines str
 main :: IO()
 main = do
         putStrLn "open file: "
-        name <- getLine
-        c <- readFile name
+        c <- readFile =<< getLine
         startMarie 1000 $ encodeStr c
