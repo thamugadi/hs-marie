@@ -9,6 +9,7 @@ import Text.Printf
 data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 | Input | Output | Halt | Skipcond Word16 | Jump Word16 deriving (Eq, Show, Read)
 data CPU = CPU Word16 Word16 Word16
 data Memory = Memory [Word16]
+data Machine = Machine CPU Memory
 
 decode :: Word16 -> Maybe Instruction
 decode instr =
@@ -41,97 +42,76 @@ encode instr =
           Skipcond sk-> 0x8000 + (mod sk 3)
           Jump addr  -> 0x9000 + addr
 
-accessMemory :: Memory -> Word16 -> Word16
-accessMemory (Memory mem) addr = maybe 0xffff id $ listToMaybe $ drop pos mem where
+accessMemory :: Machine -> Word16 -> Word16
+accessMemory (Machine cpu (Memory mem)) addr = maybe 0xffff id $ listToMaybe $ drop pos mem where
         pos = w16i addr
 
-modifyMemory :: Memory -> Word16 -> Word16 -> Memory
-modifyMemory (Memory mem) addr new 
-     | pos < length mem && pos > 0 = Memory $ take pos mem ++ [new] ++ drop (pos + 1) mem
-     | otherwise = Memory mem where
+modifyMemory :: Machine -> Word16 -> Word16 -> Machine
+modifyMemory (Machine cpu (Memory mem)) addr new 
+     | pos < length mem && pos > 0 = Machine cpu $ Memory $ take pos mem ++ [new] ++ drop (pos+1) mem
+     | otherwise = (Machine cpu (Memory mem)) where
           pos = w16i addr
 
-startMarie :: Int -> [Word16] -> IO()
-startMarie memsize rom = executeCycle firstInstr initialCPU initialmem where
-        annexmem   = replicate memsize 0
-        initialmem = Memory $ rom ++ annexmem
-        emptyCPU   = CPU 0 0 0
-        initialCPU = fetchCycle emptyCPU initialmem
-        firstInstr = decodeCycle initialCPU
+ir :: Machine -> Word16
+ir (Machine (CPU i a p) mem) = i
+ac :: Machine -> Word16
+ac (Machine (CPU i a p) mem) = a
+pc :: Machine -> Word16
+pc (Machine (CPU i a p) mem) = p
+setIR :: Machine -> Word16 -> Machine
+setIR (Machine (CPU i a p) mem) newIR = Machine (CPU newIR a p) mem
+setAC :: Machine -> Word16 -> Machine
+setAC (Machine (CPU i a p) mem) newAC = Machine (CPU i newAC p) mem
+setPC :: Machine -> Word16 -> Machine
+setPC (Machine (CPU i a p) mem) newPC = Machine (CPU i a newPC) mem
 
-illegalInstruction :: IO()
-illegalInstruction = putStrLn "!!BAD INSTRUCTION!!"
+startMachine :: Int -> [Word16] -> IO()
+startMachine memsize rom = cycle_ initialMachine where
+        emptyMachine   = Machine (CPU 0 0 0) $ Memory $ rom ++ (replicate memsize 0)
+        initialMachine = setIR emptyMachine $ accessMemory emptyMachine $ pc emptyMachine
 
-fetchCycle :: CPU -> Memory -> CPU
-fetchCycle (CPU ir ac pc) mem = CPU (accessMemory mem pc) ac (pc+1) 
+cycle_ :: Machine -> IO()
+cycle_ machine = do
+        let newMachineFetch  = setIR machine $ accessMemory machine $ pc machine
+        let newMachine       = setPC newMachineFetch $ pc newMachineFetch + 1
+        case maybe Halt id $ decode $ ir newMachine of
+             Load x     -> cycle_ $ load x newMachine
+             Store x    -> cycle_ $ store x newMachine
+             Add x      -> cycle_ $ add x newMachine
+             Sub x      -> cycle_ $ sub x newMachine
+             Input      -> cycle_ =<< input newMachine
+             Output     -> cycle_ =<< output newMachine
+             Jump x     -> cycle_ $ jump x newMachine
+             Skipcond x -> cycle_ $ skipcond x newMachine 
+             Halt       -> halt
 
-decodeCycle :: CPU -> Maybe Instruction
-decodeCycle (CPU ir ac pc) = decode ir
-
-executeCycle :: Maybe Instruction -> CPU -> Memory -> IO()
-executeCycle Nothing cpu memory = illegalInstruction
-executeCycle (Just instr) cpu memory = do
-        case instr of
-                Load x     -> newCycleNewCPU load x cpu memory
-                Store x    -> newCycleNewMemory store x cpu memory 
-                Add x      -> newCycleNewCPU add x cpu memory
-                Sub x      -> newCycleNewCPU sub x cpu memory
-                Input      -> newCycleNewIOCPU input cpu memory
-                Output     -> newCycleAfterOutput output cpu memory
-                Halt       -> halt
-                Jump     x -> newCycleNewCPU jump x cpu memory
-                Skipcond x -> newCycleNewCPU skipcond x cpu memory
-
-newCycleNewCPU :: (Word16 -> CPU -> Memory -> CPU) -> Word16 -> CPU -> Memory -> IO()
-newCycleNewCPU instr x cpu memory =
-        executeCycle nextInstruction newCPU memory where
-                cpuInstr        = instr x cpu memory
-                newCPU          = fetchCycle cpuInstr memory
-                nextInstruction = decodeCycle newCPU 
-newCycleNewMemory :: (Word16 -> CPU -> Memory -> Memory) -> Word16 -> CPU -> Memory -> IO()
-newCycleNewMemory instr x cpu memory =
-        executeCycle nextInstruction newCPU newMemory where
-                newMemory       = instr x cpu memory
-                newCPU          = fetchCycle cpu newMemory
-                nextInstruction = decodeCycle newCPU
-
-newCycleNewIOCPU :: (CPU -> IO CPU) -> CPU -> Memory -> IO()
-newCycleNewIOCPU instr cpu memory = do
-        cpuInstr <- instr cpu
-        let newCPU          = fetchCycle cpuInstr memory
-        let nextInstruction = decodeCycle newCPU
-        executeCycle nextInstruction newCPU memory
-
-newCycleAfterOutput :: (CPU -> IO()) -> CPU -> Memory -> IO()
-newCycleAfterOutput instr cpu memory = do
-        instr cpu
-        executeCycle (decodeCycle $ fetchCycle cpu memory) (fetchCycle cpu memory) memory
-
-load :: Word16 -> CPU -> Memory -> CPU
-load x (CPU ir ac pc) memory = CPU ir (accessMemory memory x) pc
-store :: Word16 -> CPU -> Memory -> Memory
-store x (CPU ir ac pc) memory = modifyMemory memory x ac
-add :: Word16 -> CPU -> Memory -> CPU
-add x (CPU ir ac pc) memory = CPU ir (ac+(accessMemory memory x)) pc
-sub :: Word16 -> CPU -> Memory -> CPU
-sub x (CPU ir ac pc) memory = CPU ir (ac-(accessMemory memory x)) pc  
-input :: CPU -> IO CPU
-input (CPU ir ac pc) = do
+load :: Word16 -> Machine -> Machine
+load x machine = setAC machine $ accessMemory machine x
+store :: Word16 -> Machine -> Machine
+store x machine = modifyMemory machine x $ ac machine
+add :: Word16 -> Machine -> Machine
+add x machine = setAC machine $ ac machine + accessMemory machine x
+sub :: Word16 -> Machine -> Machine 
+sub x machine = setAC machine $ ac machine - accessMemory machine x
+input :: Machine -> IO Machine
+input machine = do
         ch <- getChar
         let byte = fromIntegral . ord $ ch :: Word16
-        return $ CPU ir byte pc
-output :: CPU -> IO()
-output (CPU ir ac pc) = printf "0x%04x\n" ac 
-jump :: Word16 -> CPU -> Memory -> CPU
-jump x (CPU ir ac pc) memory = CPU ir ac x
+        return $ (setAC machine byte) 
+output :: Machine -> IO Machine
+output machine = do 
+        printf "0x%04x\n" (ac machine)
+        return machine
+jump :: Word16 -> Machine -> Machine
+jump x machine = setPC machine x
 
-nop :: CPU -> Memory -> CPU
-nop cpu memory = cpu
-
-skipcond :: Word16 -> CPU -> Memory -> CPU
-skipcond 0 (CPU ir ac pc) memory = if (ac < 0)  then CPU ir ac (pc+1) else CPU ir ac pc
-skipcond 1 (CPU ir ac pc) memory = if (ac == 0) then CPU ir ac (pc+1) else CPU ir ac pc
-skipcond 2 (CPU ir ac pc) memory = if (ac > 0)  then CPU ir ac (pc+1) else CPU ir ac pc
+skipcond :: Word16 -> Machine -> Machine 
+skipcond 0 machine = if (ac machine < 0)  then setPC machine $ pc machine + 1
+                                  else machine
+skipcond 1 machine = if (ac machine == 0) then setPC machine $ pc machine + 1 
+                                  else machine
+skipcond 2 machine = if (ac machine > 0)  then setPC machine $ pc machine + 1
+                                  else machine
 
 halt :: IO()
 halt = putStrLn "Halting."
@@ -157,4 +137,4 @@ main :: IO()
 main = do
         putStrLn "open file: "
         c <- readFile =<< getLine
-        startMarie 1000 $ encodeStr c
+        startMachine 1000 $ encodeStr c
