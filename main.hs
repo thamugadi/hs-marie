@@ -38,7 +38,7 @@ encode instr =
           Input      -> 0x5000
           Output     -> 0x6000
           Halt       -> 0x7000
-          Skipcond sk-> 0x8000 + (mod sk 3)
+          Skipcond sk-> 0x8000 + mod sk 3
           Jump addr  -> 0x9000 + addr
 
 accessMemory :: Machine -> Word16 -> Word16
