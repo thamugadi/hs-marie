@@ -109,7 +109,7 @@ execute instr machine =
 cycle_ :: MachineData -> IO()
 cycle_ machine = do
         if instr == Halt then halt newMachine else
-          cycle_ =<< (interface instr $ execute instr $ newMachine) where
+            cycle_ =<< (interface instr $ execute instr $ newMachine) where
                 newMachine = fetch machine
                 instr = maybe Halt id $ decode $ ir $ newMachine
 
