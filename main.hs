@@ -6,17 +6,19 @@ import Data.Maybe
 import Text.Read
 import Text.Printf
 import Numeric
-data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 | Input | Output | Halt | Skipcond Word16 | Jump Word16 deriving (Eq, Show, Read)
+
+data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 |
+                   Input | Output | Halt | Skipcond Word16 | Jump Word16
+                   deriving (Eq, Show, Read)
 data Reg = Reg Word16 Word16 Word16
 data Memory = Memory [Word16]
 data MachineData = MachineData Reg Memory
 
 instance Show Memory where
-        show (Memory mem) = "MEMORY: " ++ (concat $ map (\x -> "0x" ++ showHex x " ") mem)
+        show (Memory mem)="MEMORY: " ++ (concat $ map (\x -> "0x" ++ showHex x " ") mem)
 instance Show Reg where
-        show (Reg ir ac pc)=
-          "REGISTERS: "++"IR=0x"++(showHex ir "")++(show $ maybe Halt id $ decode ir)++
-          " AC=0x"++(showHex ac "")++" PC=0x"++(showHex pc "")
+        show (Reg ir ac pc)="REGISTERS: "++"IR=0x"++(showHex ir "")++(show $ maybe Halt id $ decode ir)++
+                             " AC=0x"++(showHex ac "")++" PC=0x"++(showHex pc "")
 instance Show MachineData where
         show (MachineData reg mem) = show reg++"\n"++show mem
 
@@ -91,8 +93,6 @@ halt machine = do
 
 cycle_ :: MachineData -> IO()
 cycle_ machine = do
-        let newMachineFetch  = setIR machine $ accessMemory machine $ pc machine
-        let newMachine       = setPC newMachineFetch $ pc newMachineFetch + 1
         case maybe Halt id $ decode $ ir newMachine of
              Load x     -> cycle_ =<< (interface $ load x newMachine)
              Store x    -> cycle_ =<< (interface $ store x newMachine)
@@ -102,7 +102,11 @@ cycle_ machine = do
              Output     -> cycle_ =<< (interface $ newMachine)
              Jump x     -> cycle_ =<< (interface $ jump x newMachine)
              Skipcond x -> cycle_ =<< (interface $ skipcond x newMachine)
-             Halt       -> halt newMachine
+             Halt       -> halt newMachine 
+        where
+             newMachineFetch   = setIR machine $ accessMemory machine $ pc machine
+             newMachine        = setPC newMachineFetch $ pc newMachineFetch + 1
+
 
 load :: Word16 -> MachineData -> MachineData
 store :: Word16 -> MachineData -> MachineData
