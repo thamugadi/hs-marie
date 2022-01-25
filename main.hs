@@ -72,8 +72,8 @@ setIR (MachineData (Reg i a p) mem) newIR = MachineData (Reg newIR a p) mem
 setAC (MachineData (Reg i a p) mem) newAC = MachineData (Reg i newAC p) mem
 setPC (MachineData (Reg i a p) mem) newPC = MachineData (Reg i a newPC) mem
 
-performIO :: MachineData -> IO MachineData
-performIO machine = do
+interface :: MachineData -> IO MachineData
+interface machine = do
         print machine
         case maybe Halt id $ decode $ ir machine of
              Input ->  do
@@ -94,14 +94,14 @@ cycle_ machine = do
         let newMachineFetch  = setIR machine $ accessMemory machine $ pc machine
         let newMachine       = setPC newMachineFetch $ pc newMachineFetch + 1
         case maybe Halt id $ decode $ ir newMachine of
-             Load x     -> cycle_ =<< (performIO $ load x newMachine)
-             Store x    -> cycle_ =<< (performIO $ store x newMachine)
-             Add x      -> cycle_ =<< (performIO $ add x newMachine)
-             Sub x      -> cycle_ =<< (performIO $ sub x newMachine)
-             Input      -> cycle_ =<< (performIO $ newMachine)
-             Output     -> cycle_ =<< (performIO $ newMachine)
-             Jump x     -> cycle_ =<< (performIO $ jump x newMachine)
-             Skipcond x -> cycle_ =<< (performIO $ skipcond x newMachine)
+             Load x     -> cycle_ =<< (interface $ load x newMachine)
+             Store x    -> cycle_ =<< (interface $ store x newMachine)
+             Add x      -> cycle_ =<< (interface $ add x newMachine)
+             Sub x      -> cycle_ =<< (interface $ sub x newMachine)
+             Input      -> cycle_ =<< (interface $ newMachine)
+             Output     -> cycle_ =<< (interface $ newMachine)
+             Jump x     -> cycle_ =<< (interface $ jump x newMachine)
+             Skipcond x -> cycle_ =<< (interface $ skipcond x newMachine)
              Halt       -> halt newMachine
 
 load :: Word16 -> MachineData -> MachineData
