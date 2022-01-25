@@ -19,9 +19,9 @@ decode instr =
           2 -> pure $ Store addr
           3 -> pure $ Add addr
           4 -> pure $ Sub addr
-          5 -> pure $ Input
-          6 -> pure $ Output
-          7 -> pure $ Halt
+          5 -> pure Input
+          6 -> pure Output
+          7 -> pure Halt
           8 -> pure $ Skipcond sk
           9 -> pure $ Jump addr
           otherwise -> Nothing
@@ -43,11 +43,11 @@ encode instr =
 
 accessMemory :: MachineData -> Word16 -> Word16
 modifyMemory :: MachineData -> Word16 -> Word16 -> MachineData
-accessMemory (MachineData cpu (Memory mem)) addr = maybe 0xffff id $ listToMaybe $ drop pos mem where
+accessMemory (MachineData reg (Memory mem)) addr = maybe 0xffff id $ listToMaybe $ drop pos mem where
         pos = w16i addr
-modifyMemory (MachineData cpu (Memory mem)) addr new 
-     | pos < length mem && pos > 0 = MachineData cpu $ Memory $ take pos mem ++ [new] ++ drop (pos+1) mem
-     | otherwise = MachineData cpu $ Memory mem where
+modifyMemory (MachineData reg (Memory mem)) addr new 
+     | pos < length mem && pos > 0 = MachineData reg $ Memory $ take pos mem ++ [new] ++ drop (pos+1) mem
+     | otherwise = MachineData reg $ Memory mem where
           pos = w16i addr
 
 ir :: MachineData -> Word16
