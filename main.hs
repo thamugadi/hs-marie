@@ -9,7 +9,7 @@ import Text.Printf
 data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 | Input | Output | Halt | Skipcond Word16 | Jump Word16 deriving (Eq, Show, Read)
 data Reg = Reg Word16 Word16 Word16
 data Memory = Memory [Word16]
-data Machine = Machine Reg Memory
+data MachineData = MachineData Reg Memory
 
 decode :: Word16 -> Maybe Instruction
 encode :: Instruction -> Word16
@@ -41,29 +41,29 @@ encode instr =
           Skipcond sk-> 0x8000 + mod sk 3
           Jump addr  -> 0x9000 + addr
 
-accessMemory :: Machine -> Word16 -> Word16
-modifyMemory :: Machine -> Word16 -> Word16 -> Machine
-accessMemory (Machine cpu (Memory mem)) addr = maybe 0xffff id $ listToMaybe $ drop pos mem where
+accessMemory :: MachineData -> Word16 -> Word16
+modifyMemory :: MachineData -> Word16 -> Word16 -> MachineData
+accessMemory (MachineData cpu (Memory mem)) addr = maybe 0xffff id $ listToMaybe $ drop pos mem where
         pos = w16i addr
-modifyMemory (Machine cpu (Memory mem)) addr new 
-     | pos < length mem && pos > 0 = Machine cpu $ Memory $ take pos mem ++ [new] ++ drop (pos+1) mem
-     | otherwise = Machine cpu $ Memory mem where
+modifyMemory (MachineData cpu (Memory mem)) addr new 
+     | pos < length mem && pos > 0 = MachineData cpu $ Memory $ take pos mem ++ [new] ++ drop (pos+1) mem
+     | otherwise = MachineData cpu $ Memory mem where
           pos = w16i addr
 
-ir :: Machine -> Word16
-ac :: Machine -> Word16
-pc :: Machine -> Word16
-setIR :: Machine -> Word16 -> Machine
-setAC :: Machine -> Word16 -> Machine
-setPC :: Machine -> Word16 -> Machine
-ir (Machine (Reg i a p) mem) = i
-ac (Machine (Reg i a p) mem) = a
-pc (Machine (Reg i a p) mem) = p
-setIR (Machine (Reg i a p) mem) newIR = Machine (Reg newIR a p) mem
-setAC (Machine (Reg i a p) mem) newAC = Machine (Reg i newAC p) mem
-setPC (Machine (Reg i a p) mem) newPC = Machine (Reg i a newPC) mem
+ir :: MachineData -> Word16
+ac :: MachineData -> Word16
+pc :: MachineData -> Word16
+setIR :: MachineData -> Word16 -> MachineData
+setAC :: MachineData -> Word16 -> MachineData
+setPC :: MachineData -> Word16 -> MachineData
+ir (MachineData (Reg i a p) mem) = i
+ac (MachineData (Reg i a p) mem) = a
+pc (MachineData (Reg i a p) mem) = p
+setIR (MachineData (Reg i a p) mem) newIR = MachineData (Reg newIR a p) mem
+setAC (MachineData (Reg i a p) mem) newAC = MachineData (Reg i newAC p) mem
+setPC (MachineData (Reg i a p) mem) newPC = MachineData (Reg i a newPC) mem
 
-cycle_ :: Machine -> IO()
+cycle_ :: MachineData -> IO()
 cycle_ machine = do
         let newMachineFetch  = setIR machine $ accessMemory machine $ pc machine
         let newMachine       = setPC newMachineFetch $ pc newMachineFetch + 1
@@ -78,14 +78,14 @@ cycle_ machine = do
              Skipcond x -> cycle_ $ skipcond x newMachine 
              Halt       -> halt
 
-load :: Word16 -> Machine -> Machine
-store :: Word16 -> Machine -> Machine
-add :: Word16 -> Machine -> Machine
-sub :: Word16 -> Machine -> Machine
-input :: Machine -> IO Machine
-output :: Machine -> IO Machine
-jump :: Word16 -> Machine -> Machine
-skipcond :: Word16 -> Machine -> Machine
+load :: Word16 -> MachineData -> MachineData
+store :: Word16 -> MachineData -> MachineData
+add :: Word16 -> MachineData -> MachineData
+sub :: Word16 -> MachineData -> MachineData
+input :: MachineData -> IO MachineData
+output :: MachineData -> IO MachineData
+jump :: Word16 -> MachineData -> MachineData
+skipcond :: Word16 -> MachineData -> MachineData
 halt :: IO()
 load x machine = setAC machine $ accessMemory machine x
 store x machine = modifyMemory machine x $ ac machine
@@ -124,7 +124,7 @@ w16i n = fromIntegral n :: Int
 
 startMachine :: Int -> [Word16] -> IO()
 startMachine memsize rom = cycle_ initialMachine where
-        emptyMachine   = Machine (Reg 0 0 0) $ Memory $ rom ++ replicate memsize 0
+        emptyMachine   = MachineData (Reg 0 0 0) $ Memory $ rom ++ replicate memsize 0
         initialMachine = setIR emptyMachine $ accessMemory emptyMachine $ pc emptyMachine
 
 main :: IO()
