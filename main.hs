@@ -17,8 +17,7 @@ data MachineData = MachineData Reg Memory
 instance Show Memory where
         show (Memory mem)="MEMORY: " ++ (concat $ map (\x -> "0x" ++ showHex x " ") mem)
 instance Show Reg where
-        show (Reg ir ac pc)="REGISTERS: "++"IR=0x"++(showHex ir "")++(show $ maybe Halt id $ decode ir)++
-                             " AC=0x"++(showHex ac "")++" PC=0x"++(showHex pc "")
+        show (Reg ir ac pc)="REGISTERS: "++"IR=0x"++(showHex ir "")++(show $ maybe Halt id $ decode ir)++" AC=0x"++(showHex ac "")++" PC=0x"++(showHex pc "")
 instance Show MachineData where
         show (MachineData reg mem) = show reg++"\n"++show mem
 
