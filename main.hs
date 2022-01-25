@@ -19,9 +19,9 @@ decode instr =
           2 -> pure $ Store addr
           3 -> pure $ Add addr
           4 -> pure $ Sub addr
-          5 -> pure Input
-          6 -> pure Output
-          7 -> pure Halt
+          5 -> pure $ Input
+          6 -> pure $ Output
+          7 -> pure $ Halt
           8 -> pure $ Skipcond sk
           9 -> pure $ Jump addr
           otherwise -> Nothing
