@@ -73,10 +73,10 @@ setIR (MachineData (Reg i a p) mem) newIR = MachineData (Reg newIR a p) mem
 setAC (MachineData (Reg i a p) mem) newAC = MachineData (Reg i newAC p) mem
 setPC (MachineData (Reg i a p) mem) newPC = MachineData (Reg i a newPC) mem
 
-interface :: MachineData -> IO MachineData
-interface machine = do
+interface :: Instruction -> MachineData -> IO MachineData
+interface instr machine = do
         print machine
-        case maybe Halt id $ decode $ ir machine of
+        case instr of 
              Input ->  do
                         ch <- getChar
                         pure $ setAC machine (fromIntegral . ord $ ch :: Word16)
@@ -92,20 +92,20 @@ halt machine = do
 
 cycle_ :: MachineData -> IO()
 cycle_ machine = do
-        case maybe Halt id $ decode $ ir newMachine of
-             Load x     -> cycle_ =<< (interface $ load x newMachine)
-             Store x    -> cycle_ =<< (interface $ store x newMachine)
-             Add x      -> cycle_ =<< (interface $ add x newMachine)
-             Sub x      -> cycle_ =<< (interface $ sub x newMachine)
-             Input      -> cycle_ =<< (interface $ newMachine)
-             Output     -> cycle_ =<< (interface $ newMachine)
-             Jump x     -> cycle_ =<< (interface $ jump x newMachine)
-             Skipcond x -> cycle_ =<< (interface $ skipcond x newMachine)
+        case instr of
+             Load x     -> cycle_ =<< (interface instr $ load x newMachine)
+             Store x    -> cycle_ =<< (interface instr $ store x newMachine)
+             Add x      -> cycle_ =<< (interface instr $ add x newMachine)
+             Sub x      -> cycle_ =<< (interface instr $ sub x newMachine)
+             Input      -> cycle_ =<< (interface instr $ newMachine)
+             Output     -> cycle_ =<< (interface instr $ newMachine)
+             Jump x     -> cycle_ =<< (interface instr $ jump x newMachine)
+             Skipcond x -> cycle_ =<< (interface instr $ skipcond x newMachine)
              Halt       -> halt newMachine 
         where
              newMachineFetch   = setIR machine $ accessMemory machine $ pc machine
              newMachine        = setPC newMachineFetch $ pc newMachineFetch + 1
-
+             instr             = maybe Halt id $ decode $ ir newMachine
 
 load :: Word16 -> MachineData -> MachineData
 store :: Word16 -> MachineData -> MachineData
