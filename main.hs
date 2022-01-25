@@ -15,15 +15,15 @@ decode :: Word16 -> Maybe Instruction
 encode :: Instruction -> Word16
 decode instr =
         case op of
-          1 -> Just $ Load addr
-          2 -> Just $ Store addr
-          3 -> Just $ Add addr
-          4 -> Just $ Sub addr
-          5 -> Just Input
-          6 -> Just Output
-          7 -> Just Halt
-          8 -> Just $ Skipcond sk
-          9 -> Just $ Jump addr
+          1 -> pure $ Load addr
+          2 -> pure $ Store addr
+          3 -> pure $ Add addr
+          4 -> pure $ Sub addr
+          5 -> pure Input
+          6 -> pure Output
+          7 -> pure Halt
+          8 -> pure $ Skipcond sk
+          9 -> pure $ Jump addr
           otherwise -> Nothing
         where 
                 op   = shiftR instr 12
