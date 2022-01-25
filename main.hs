@@ -5,11 +5,20 @@ import Data.Char
 import Data.Maybe
 import Text.Read
 import Text.Printf
-
+import Numeric
 data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 | Input | Output | Halt | Skipcond Word16 | Jump Word16 deriving (Eq, Show, Read)
 data Reg = Reg Word16 Word16 Word16
 data Memory = Memory [Word16]
 data MachineData = MachineData Reg Memory
+
+instance Show Memory where
+        show (Memory mem) = "MEMORY: " ++ (concat $ map (\x -> "0x" ++ showHex x " ") mem)
+instance Show Reg where
+        show (Reg ir ac pc)=
+          "REGISTERS: "++"IR=0x"++(showHex ir "")++(show $ maybe Halt id $ decode ir)++
+          " AC=0x"++(showHex ac "")++" PC=0x"++(showHex pc "")
+instance Show MachineData where
+        show (MachineData reg mem) = show reg++"\n"++show mem
 
 decode :: Word16 -> Maybe Instruction
 encode :: Instruction -> Word16
@@ -63,46 +72,52 @@ setIR (MachineData (Reg i a p) mem) newIR = MachineData (Reg newIR a p) mem
 setAC (MachineData (Reg i a p) mem) newAC = MachineData (Reg i newAC p) mem
 setPC (MachineData (Reg i a p) mem) newPC = MachineData (Reg i a newPC) mem
 
+performIO :: MachineData -> IO MachineData
+performIO machine = do
+        print machine
+        case maybe Halt id $ decode $ ir machine of
+             Input ->  do
+                        ch <- getChar
+                        pure $ setAC machine (fromIntegral . ord $ ch :: Word16)
+             Output -> do
+                        printf "0x%04x\n" $ ac machine
+                        pure machine
+             otherwise -> pure machine
+
+halt :: MachineData -> IO()
+halt machine = do
+        print machine
+        print "Halting."
+
 cycle_ :: MachineData -> IO()
 cycle_ machine = do
         let newMachineFetch  = setIR machine $ accessMemory machine $ pc machine
         let newMachine       = setPC newMachineFetch $ pc newMachineFetch + 1
         case maybe Halt id $ decode $ ir newMachine of
-             Load x     -> cycle_ $ load x newMachine
-             Store x    -> cycle_ $ store x newMachine
-             Add x      -> cycle_ $ add x newMachine
-             Sub x      -> cycle_ $ sub x newMachine
-             Input      -> cycle_ =<< input newMachine
-             Output     -> cycle_ =<< output newMachine
-             Jump x     -> cycle_ $ jump x newMachine
-             Skipcond x -> cycle_ $ skipcond x newMachine 
-             Halt       -> halt
+             Load x     -> cycle_ =<< (performIO $ load x newMachine)
+             Store x    -> cycle_ =<< (performIO $ store x newMachine)
+             Add x      -> cycle_ =<< (performIO $ add x newMachine)
+             Sub x      -> cycle_ =<< (performIO $ sub x newMachine)
+             Input      -> cycle_ =<< (performIO $ newMachine)
+             Output     -> cycle_ =<< (performIO $ newMachine)
+             Jump x     -> cycle_ =<< (performIO $ jump x newMachine)
+             Skipcond x -> cycle_ =<< (performIO $ skipcond x newMachine)
+             Halt       -> halt newMachine
 
 load :: Word16 -> MachineData -> MachineData
 store :: Word16 -> MachineData -> MachineData
 add :: Word16 -> MachineData -> MachineData
 sub :: Word16 -> MachineData -> MachineData
-input :: MachineData -> IO MachineData
-output :: MachineData -> IO MachineData
 jump :: Word16 -> MachineData -> MachineData
 skipcond :: Word16 -> MachineData -> MachineData
-halt :: IO()
 load x machine = setAC machine $ accessMemory machine x
 store x machine = modifyMemory machine x $ ac machine
 add x machine = setAC machine $ ac machine + accessMemory machine x
 sub x machine = setAC machine $ ac machine - accessMemory machine x
-input machine = do
-        ch <- getChar
-        let byte = fromIntegral . ord $ ch :: Word16
-        return $ setAC machine byte
-output machine = do 
-        printf "0x%04x\n" $ ac machine
-        return machine
 jump x machine = setPC machine x
 skipcond 0 machine = if (ac machine <  0)  then setPC machine $ pc machine + 1 else machine
 skipcond 1 machine = if (ac machine == 0)  then setPC machine $ pc machine + 1 else machine
 skipcond 2 machine = if (ac machine >  0)  then setPC machine $ pc machine + 1 else machine
-halt = putStrLn "Halting."
 
 
 list2data :: [String] -> [Word16]
@@ -131,4 +146,4 @@ main :: IO()
 main = do
         putStrLn "open file: "
         c <- readFile =<< getLine
-        startMachine 1000 $ encodeStr c
+        startMachine 10 $ encodeStr c
