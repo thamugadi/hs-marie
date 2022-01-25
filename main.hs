@@ -7,9 +7,9 @@ import Text.Read
 import Text.Printf
 
 data Instruction = Load Word16 | Store Word16 | Add Word16 | Sub Word16 | Input | Output | Halt | Skipcond Word16 | Jump Word16 deriving (Eq, Show, Read)
-data CPU = CPU Word16 Word16 Word16
+data Reg = Reg Word16 Word16 Word16
 data Memory = Memory [Word16]
-data Machine = Machine CPU Memory
+data Machine = Machine Reg Memory
 
 decode :: Word16 -> Maybe Instruction
 encode :: Instruction -> Word16
@@ -56,12 +56,12 @@ pc :: Machine -> Word16
 setIR :: Machine -> Word16 -> Machine
 setAC :: Machine -> Word16 -> Machine
 setPC :: Machine -> Word16 -> Machine
-ir (Machine (CPU i a p) mem) = i
-ac (Machine (CPU i a p) mem) = a
-pc (Machine (CPU i a p) mem) = p
-setIR (Machine (CPU i a p) mem) newIR = Machine (CPU newIR a p) mem
-setAC (Machine (CPU i a p) mem) newAC = Machine (CPU i newAC p) mem
-setPC (Machine (CPU i a p) mem) newPC = Machine (CPU i a newPC) mem
+ir (Machine (Reg i a p) mem) = i
+ac (Machine (Reg i a p) mem) = a
+pc (Machine (Reg i a p) mem) = p
+setIR (Machine (Reg i a p) mem) newIR = Machine (Reg newIR a p) mem
+setAC (Machine (Reg i a p) mem) newAC = Machine (Reg i newAC p) mem
+setPC (Machine (Reg i a p) mem) newPC = Machine (Reg i a newPC) mem
 
 cycle_ :: Machine -> IO()
 cycle_ machine = do
@@ -124,7 +124,7 @@ w16i n = fromIntegral n :: Int
 
 startMachine :: Int -> [Word16] -> IO()
 startMachine memsize rom = cycle_ initialMachine where
-        emptyMachine   = Machine (CPU 0 0 0) $ Memory $ rom ++ replicate memsize 0
+        emptyMachine   = Machine (Reg 0 0 0) $ Memory $ rom ++ replicate memsize 0
         initialMachine = setIR emptyMachine $ accessMemory emptyMachine $ pc emptyMachine
 
 main :: IO()
