@@ -141,9 +141,7 @@ orb  a b = (.|.) a b
 w16i n = fromIntegral n :: Int
 
 startMachine :: Int -> [Word16] -> IO()
-startMachine memsize rom = cycle_ initialMachine where
-        emptyMachine   = MachineData (Reg 0 0 0) $ Memory $ rom ++ replicate memsize 0
-        initialMachine = setIR emptyMachine $ accessMemory emptyMachine $ pc emptyMachine
+startMachine memsize rom = cycle_ $ MachineData (Reg 0 0 0) $ Memory $ rom ++ replicate memsize 0
 
 main :: IO()
 main = do
