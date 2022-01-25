@@ -88,24 +88,30 @@ interface instr machine = do
 halt :: MachineData -> IO()
 halt machine = do
         print machine
-        print "Halting."
+        putStrLn "Halting."
+
+fetch :: MachineData -> MachineData
+fetch machine = setPC newMachineFetch $ pc newMachineFetch + 1 where
+        newMachineFetch = setIR machine $ accessMemory machine $ pc machine
+
+execute :: Instruction -> MachineData -> MachineData
+execute instr machine =
+        case instr of
+             Load x     -> load x machine
+             Store x    -> store x machine
+             Add x      -> add x machine
+             Sub x      -> sub x machine
+             Input      -> machine
+             Output     -> machine
+             Jump x     -> jump x machine
+             Skipcond x -> skipcond x machine
 
 cycle_ :: MachineData -> IO()
 cycle_ machine = do
-        case instr of
-             Load x     -> cycle_ =<< (interface instr $ load x newMachine)
-             Store x    -> cycle_ =<< (interface instr $ store x newMachine)
-             Add x      -> cycle_ =<< (interface instr $ add x newMachine)
-             Sub x      -> cycle_ =<< (interface instr $ sub x newMachine)
-             Input      -> cycle_ =<< (interface instr $ newMachine)
-             Output     -> cycle_ =<< (interface instr $ newMachine)
-             Jump x     -> cycle_ =<< (interface instr $ jump x newMachine)
-             Skipcond x -> cycle_ =<< (interface instr $ skipcond x newMachine)
-             Halt       -> halt newMachine 
-        where
-             newMachineFetch   = setIR machine $ accessMemory machine $ pc machine
-             newMachine        = setPC newMachineFetch $ pc newMachineFetch + 1
-             instr             = maybe Halt id $ decode $ ir newMachine
+        if instr == Halt then halt newMachine else
+          cycle_ =<< (interface instr $ execute instr $ newMachine) where
+                newMachine = fetch machine
+                instr = maybe Halt id $ decode $ ir $ newMachine
 
 load :: Word16 -> MachineData -> MachineData
 store :: Word16 -> MachineData -> MachineData
